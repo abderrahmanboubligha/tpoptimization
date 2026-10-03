@@ -1,0 +1,171 @@
+\documentclass[10pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage[margin=1.8cm]{geometry}
+\usepackage{amsmath,booktabs,pgfplots}
+\pgfplotsset{compat=1.18}
+\usepackage{microtype}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{5pt}
+\begin{document}
+
+\section*{TP : méthodes d’optimisation avec NumPy}
+\subsection*{Introduction}
+Dans ce TP, je compare sept méthodes pour réduire une erreur : GD, GD avec recherche du pas, SGD, Momentum, AdaGrad, RMSprop et Adam. Je les applique à une régression, une classification et un clustering. Le code des modèles et des mises à jour utilise NumPy. Les résultats ci-dessous proviennent des trois jeux disponibles dans l’archive.
+
+\subsection*{Données utilisées}
+Les données proviennent de optimisation\_datasets.zip, dont le README indique une graine de génération 2026. Les partitions des CSV sont conservées. Pour la régression et la classification, les moyennes et écarts types sont calculés sur le train seulement. La cible de régression est aussi standardisée, puis les prédictions reviennent à l’unité d’origine. Pour Blobs, toutes les observations sont standardisées sans utiliser leurs classes.
+
+\subsection*{Protocole commun}
+Les graines sont 42, 123 et 2024. Chaque méthode dispose de 150 époques. GD utilise toutes les données à chaque mise à jour. SGD, Momentum, AdaGrad, RMSprop et Adam utilisent des lots mélangés de 32. Les initialisations sont identiques entre méthodes pour une même graine. On conserve l’état ayant le meilleur critère de sélection, sans modifier le test.
+
+\subsection*{Choix des paramètres}
+Deux pas sont comparés avec la graine 42, puis le meilleur est utilisé pour les trois graines. Le critère est la RMSE de validation en régression, la perte de validation en classification et la perte sans étiquette en clustering. Les mémoires commencent à zéro ; mu = rho = beta1 = 0,9, beta2 = 0,999 et epsilon = 10\textasciicircum{}-8.
+
+\subsection*{Limite du travail}
+L’énoncé demande huit jeux de données. Diabetes, Iris, Wine, MNIST et Fashion-MNIST sont absents de l’archive et ne sont pas évalués ici. Ce rapport est donc une synthèse des trois jeux disponibles, et non une validation de tout le sujet. Les tableaux complets et les figures plus grandes se trouvent dans le dossier resultats.
+
+\begin{center}{\footnotesize Tableau 1 - Effectifs\par\medskip\begin{tabular}{lllll}\toprule
+Jeu & Variables & Train & Validation & Test \\
+\midrule
+Nonlinear & 2 & 216 & 72 & 72 \\
+Spiral3 & 2 & 270 & 90 & 90 \\
+Blobs3 & 2 & 360 sans étiquette & - & Même ensemble \\
+\bottomrule\end{tabular}}\end{center}
+\begin{center}{\footnotesize Tableau 2 - Idée simple des sept méthodes\par\medskip\begin{tabular}{ll}\toprule
+Méthode & Principe \\
+\midrule
+GD & Un gradient sur toutes les données \\
+GD-recherche & Un pas calculé ou recherché à chaque mise à jour \\
+SGD & Des petits lots mélangés à chaque époque \\
+Momentum & Une mémoire des gradients pour guider la descente \\
+AdaGrad & Un pas adapté aux gradients accumulés \\
+RMSprop & Une moyenne récente des gradients au carré \\
+Adam & Deux moyennes et une correction du biais \\
+\bottomrule\end{tabular}}\end{center}
+\newpage
+\section*{Exercice 1 : régression}
+\subsection*{Modèles et gradient}
+OLS et ridge utilisent une droite dans les deux variables : prediction = w0 + w1*x1 + w2*x2. L’objectif vaut ||Xw-y||\textsuperscript{2}/(2n) + lambda*w\textsuperscript{T}Pw/2. Son gradient est X\textsuperscript{T}(Xw-y)/n + lambda*Pw, avec P = diag(0,1,1) : le biais n’est pas pénalisé. OLS prend lambda = 0.
+
+\subsection*{Noyau RBF et recherche du pas}
+Le noyau Kij = exp(-||xi-xj||\textsuperscript{2}/(2*sigma\textsuperscript{2})) permet une relation non linéaire. Le gradient est K(Ka-y)/n + lambda*Ka. En mini-lot, seul le terme d’erreur est limité au lot ; la régularisation reste entière. Pour un objectif quadratique de Hessienne H, on minimise l’expression selon eta et on obtient eta = (g\textsuperscript{T}g)/(g\textsuperscript{T}Hg), lorsque le dénominateur est positif.
+
+\subsection*{Ce que je remarque}
+Le tableau 3 montre que le choix de la méthode compte aussi pour le noyau RBF. Adam est retenu sur la validation. Sa RMSE test vaut 0.180 $\pm$ 0.004, contre environ 0,82 pour OLS et ridge. Le noyau représente mieux la forme non linéaire des données. Les paramètres retenus sont lambda = 0.001 et sigma = 0.5. La figure 1 compare les pertes ; la figure 2 montre que les prédictions suivent la diagonale et que les résidus sont souvent proches de zéro.
+
+\begin{center}{\footnotesize Tableau 3 - RBF, test : moyennes sur trois graines\par\medskip\begin{tabular}{lllll}\toprule
+Méthode & MSE & RMSE $\pm$ é.t. & MAE & R\textsuperscript{2} \\
+\midrule
+GD & 0.327 & 0.572 $\pm$ 0.000 & 0.490 & 0.517 \\
+GD-recherche & 0.049 & 0.221 $\pm$ 0.000 & 0.158 & 0.928 \\
+SGD & 0.108 & 0.328 $\pm$ 0.000 & 0.251 & 0.841 \\
+Momentum & 0.050 & 0.224 $\pm$ 0.000 & 0.161 & 0.926 \\
+AdaGrad & 0.081 & 0.285 $\pm$ 0.002 & 0.212 & 0.880 \\
+RMSprop & 0.037 & 0.191 $\pm$ 0.006 & 0.145 & 0.946 \\
+Adam & 0.032 & 0.180 $\pm$ 0.004 & 0.137 & 0.952 \\
+\bottomrule\end{tabular}}\end{center}
+\begin{center}\begin{tikzpicture}\begin{axis}[width=13cm,height=4cm,xlabel={Époque},ylabel={Objectif de sélection},legend style={font=\tiny,at={(1.02,1)},anchor=north west},scaled ticks=false]
+\addplot+[mark=none] coordinates {(1,0.51169) (11,0.48639) (21,0.46464) (31,0.44544) (41,0.42815) (51,0.41238) (61,0.39785) (71,0.38439) (81,0.37186) (91,0.36013) (101,0.34914) (111,0.33881) (121,0.32908) (131,0.31990) (141,0.31123) (150,0.30383)};\addlegendentry{GD}
+\addplot+[mark=none] coordinates {(1,0.39160) (11,0.13063) (21,0.10206) (31,0.08911) (41,0.08147) (51,0.07642) (61,0.07284) (71,0.07017) (81,0.06812) (91,0.06650) (101,0.06520) (111,0.06412) (121,0.06322) (131,0.06245) (141,0.06179) (150,0.06133)};\addlegendentry{GD-recherche}
+\addplot+[mark=none] coordinates {(1,0.49592) (11,0.37672) (21,0.30590) (31,0.25851) (41,0.22451) (51,0.19986) (61,0.18142) (71,0.16768) (81,0.15698) (91,0.14849) (101,0.14126) (111,0.13568) (121,0.13067) (131,0.12645) (141,0.12259) (150,0.11966)};\addlegendentry{SGD}
+\addplot+[mark=none] coordinates {(1,0.45975) (11,0.13600) (21,0.10439) (31,0.09138) (41,0.08413) (51,0.07768) (61,0.07458) (71,0.07103) (81,0.06931) (91,0.06684) (101,0.06628) (111,0.06535) (121,0.06386) (131,0.06337) (141,0.06246) (150,0.06177)};\addlegendentry{Momentum}
+\addplot+[mark=none] coordinates {(1,0.36715) (11,0.19697) (21,0.15817) (31,0.14046) (41,0.12938) (51,0.12129) (61,0.11497) (71,0.11054) (81,0.10657) (91,0.10335) (101,0.09998) (111,0.09792) (121,0.09532) (131,0.09347) (141,0.09145) (150,0.09015)};\addlegendentry{AdaGrad}
+\addplot+[mark=none] coordinates {(1,0.21637) (11,0.08368) (21,0.07402) (31,0.06207) (41,0.06417) (51,0.05704) (61,0.05414) (71,0.05681) (81,0.06277) (91,0.07173) (101,0.05902) (111,0.06751) (121,0.05880) (131,0.05490) (141,0.07000) (150,0.05311)};\addlegendentry{RMSprop}
+\addplot+[mark=none] coordinates {(1,0.29837) (11,0.08625) (21,0.06442) (31,0.06095) (41,0.05886) (51,0.05820) (61,0.05506) (71,0.05478) (81,0.05263) (91,0.05190) (101,0.05189) (111,0.05154) (121,0.05189) (131,0.05282) (141,0.05069) (150,0.05195)};\addlegendentry{Adam}
+\end{axis}\end{tikzpicture}\par{\footnotesize Figure 1 : comparaison des sept méthodes, graine 42. Validation.}\end{center}
+Les figures de prédictions, de confusion et de groupes décrites dans cette page sont incluses dans le PDF de lecture et disponibles dans le dossier resultats. La source LaTeX autonome montre ici les courbes de comparaison.
+
+\newpage
+\section*{Exercice 2 : classification des spirales}
+\subsection*{Réseau simple}
+Le réseau possède trois couches entraînables : 2 $\rightarrow$ 32 $\rightarrow$ 16 $\rightarrow$ 3. Les deux couches cachées utilisent tanh. La dernière couche utilise softmax, stabilisé en soustrayant le maximum de chaque ligne. Les poids suivent une initialisation de type Xavier et les biais sont nuls. Chaque classe contient 150 observations, avec 90/30/30 pour train/validation/test.
+
+\subsection*{Rétropropagation}
+La perte est l’entropie croisée plus lambda/2 fois la somme des carrés des poids, avec lambda = 0,0001. On part de D3 = (P-Y)/taille\_du\_lot. Puis D2 = (D3 W3\textsuperscript{T}) * (1-H2\textsuperscript{2}) et D1 = (D2 W2\textsuperscript{T}) * (1-H1\textsuperscript{2}). Les gradients des poids sont les produits des activations transposées avec ces erreurs, plus lambda*W. Les gradients des biais sont les sommes des erreurs.
+
+\subsection*{Ce que je remarque}
+RMSprop est retenu sur la perte de validation. Son exactitude test moyenne est de 100.00 \%. GD progresse moins avec le pas essayé. Le tableau 4 compare aussi la précision, le rappel et le F1 macro. Ces mesures donnent le même poids aux trois classes. La figure 3 montre la baisse de la perte et la figure 4 montre les erreurs et la frontière obtenue. Les résultats restent propres à ce petit jeu de spirales.
+
+\begin{center}{\footnotesize Tableau 4 - Test, moyennes sur 3 graines ; écarts types dans resume.csv\par\medskip\begin{tabular}{llllll}\toprule
+Méthode & Acc. & Préc. & Rappel & F1 & Entropie \\
+\midrule
+GD & 0.737 & 0.738 & 0.737 & 0.737 & 0.515 \\
+GD-recherche & 0.993 & 0.993 & 0.993 & 0.993 & 0.018 \\
+SGD & 0.996 & 0.996 & 0.996 & 0.996 & 0.019 \\
+Momentum & 0.989 & 0.989 & 0.989 & 0.989 & 0.023 \\
+AdaGrad & 0.907 & 0.909 & 0.907 & 0.907 & 0.315 \\
+RMSprop & 1.000 & 1.000 & 1.000 & 1.000 & 0.003 \\
+Adam & 0.996 & 0.996 & 0.996 & 0.996 & 0.011 \\
+\bottomrule\end{tabular}}\end{center}
+\begin{center}\begin{tikzpicture}\begin{axis}[width=13cm,height=4cm,xlabel={Époque},ylabel={Objectif de sélection},legend style={font=\tiny,at={(1.02,1)},anchor=north west},scaled ticks=false]
+\addplot+[mark=none] coordinates {(1,1.07976) (11,0.71492) (21,0.66168) (31,0.64465) (41,0.63666) (51,0.63137) (61,0.62672) (71,0.62195) (81,0.61671) (91,0.61083) (101,0.60422) (111,0.59680) (121,0.58855) (131,0.57943) (141,0.56943) (150,0.55966)};\addlegendentry{GD}
+\addplot+[mark=none] coordinates {(1,0.64444) (11,0.57369) (21,0.47396) (31,0.34709) (41,0.25329) (51,0.19627) (61,0.15740) (71,0.12577) (81,0.09975) (91,0.08078) (101,0.06180) (111,0.05172) (121,0.04779) (131,0.04656) (141,0.04641) (150,0.04242)};\addlegendentry{GD-recherche}
+\addplot+[mark=none] coordinates {(1,0.74616) (11,0.59732) (21,0.50083) (31,0.37092) (41,0.26483) (51,0.18573) (61,0.13864) (71,0.11435) (81,0.08442) (91,0.07171) (101,0.05988) (111,0.05337) (121,0.04895) (131,0.04333) (141,0.04216) (150,0.03979)};\addlegendentry{SGD}
+\addplot+[mark=none] coordinates {(1,0.87591) (11,0.61756) (21,0.55584) (31,0.43669) (41,0.31331) (51,0.22045) (61,0.16286) (71,0.12377) (81,0.09729) (91,0.07817) (101,0.06671) (111,0.05813) (121,0.05167) (131,0.04558) (141,0.04406) (150,0.04180)};\addlegendentry{Momentum}
+\addplot+[mark=none] coordinates {(1,0.76253) (11,0.62694) (21,0.61314) (31,0.59831) (41,0.58393) (51,0.56277) (61,0.55101) (71,0.52637) (81,0.50626) (91,0.48758) (101,0.46872) (111,0.45165) (121,0.43698) (131,0.42283) (141,0.40545) (150,0.39231)};\addlegendentry{AdaGrad}
+\addplot+[mark=none] coordinates {(1,0.68156) (11,0.39260) (21,0.12229) (31,0.04082) (41,0.13627) (51,0.02609) (61,0.01584) (71,0.03340) (81,0.03855) (91,0.05912) (101,0.07582) (111,0.07481) (121,0.07416) (131,0.07962) (141,0.07738) (150,0.08652)};\addlegendentry{RMSprop}
+\addplot+[mark=none] coordinates {(1,0.66452) (11,0.40851) (21,0.10863) (31,0.05126) (41,0.04385) (51,0.04106) (61,0.03944) (71,0.04307) (81,0.04123) (91,0.03953) (101,0.04290) (111,0.04702) (121,0.04695) (131,0.04481) (141,0.05074) (150,0.05006)};\addlegendentry{Adam}
+\end{axis}\end{tikzpicture}\par{\footnotesize Figure 2 : comparaison des sept méthodes, graine 42. Validation.}\end{center}
+Les figures de prédictions, de confusion et de groupes décrites dans cette page sont incluses dans le PDF de lecture et disponibles dans le dossier resultats. La source LaTeX autonome montre ici les courbes de comparaison.
+
+\newpage
+\section*{Exercice 3 : clustering des points}
+\subsection*{Apprendre sans les classes}
+On cherche K = 3 centroïdes, initialisés avec trois points distincts. Les étiquettes true\_label ne servent ni au gradient ni à la sélection. Elles sont lues seulement pour l’évaluation finale. Tau = 0,25. On utilise les distances D = ||x||\textsuperscript{2} + ||c||\textsuperscript{2} - 2*x\textsuperscript{T}c pour éviter de créer un gros tableau de différences.
+
+\subsection*{Objectif et gradient}
+L’objectif doux est J = -tau/n * somme log[(1/K)*somme exp(-D/tau)]. Les probabilités Q sont un softmax de -D/tau. Le gradient vaut 2/n * [diag(Q\textsuperscript{T}1)C - Q\textsuperscript{T}X]. Le logarithme de la somme des exponentielles est calculé après soustraction du maximum. À la fin, chaque point est affecté au centroïde le plus proche.
+
+\subsection*{Ce que je remarque}
+GD avec recherche du pas est retenu selon J sans étiquette. Les sept méthodes donnent des groupes proches, avec un ARI moyen de 0.975. Lloyd sert de référence séparée. Le tableau 5 montre que la faible inertie s’accompagne ici d’une bonne correspondance avec les classes. Ce n’est pas garanti pour d’autres données. Les figures 5 et 6 montrent la descente de l’objectif et les groupes. L’évaluation porte sur les mêmes 360 points que l’apprentissage, sans jeu de test séparé.
+
+\begin{center}{\footnotesize Tableau 5 - Moyennes sur 3 graines ; écarts types dans resume.csv\par\medskip\begin{tabular}{llllll}\toprule
+Méthode & J doux & Inertie & Silhouette & ARI & NMI \\
+\midrule
+GD & 0.564 & 0.290 & 0.679 & 0.975 & 0.960 \\
+GD-recherche & 0.564 & 0.290 & 0.679 & 0.975 & 0.960 \\
+SGD & 0.564 & 0.290 & 0.679 & 0.975 & 0.960 \\
+Momentum & 0.564 & 0.290 & 0.679 & 0.975 & 0.960 \\
+AdaGrad & 0.564 & 0.290 & 0.679 & 0.975 & 0.960 \\
+RMSprop & 0.564 & 0.290 & 0.679 & 0.975 & 0.960 \\
+Adam & 0.564 & 0.290 & 0.679 & 0.975 & 0.960 \\
+Lloyd & 0.564 & 0.290 & 0.679 & 0.975 & 0.960 \\
+\bottomrule\end{tabular}}\end{center}
+\begin{center}\begin{tikzpicture}\begin{axis}[width=13cm,height=4cm,xlabel={Époque},ylabel={Objectif de sélection},legend style={font=\tiny,at={(1.02,1)},anchor=north west},scaled ticks=false]
+\addplot+[mark=none] coordinates {(1,1.62168) (11,1.40145) (21,0.88952) (31,0.65230) (41,0.58688) (51,0.57005) (61,0.56575) (71,0.56465) (81,0.56437) (91,0.56430) (101,0.56428) (111,0.56428) (121,0.56428) (131,0.56428) (141,0.56428) (150,0.56428)};\addlegendentry{GD}
+\addplot+[mark=none] coordinates {(1,1.47825) (11,0.56428) (21,0.56428) (31,0.56428) (41,0.56428) (51,0.56428) (61,0.56428) (71,0.56428) (81,0.56428) (91,0.56428) (101,0.56428) (111,0.56428) (121,0.56428) (131,0.56428) (141,0.56428) (150,0.56428)};\addlegendentry{GD-recherche}
+\addplot+[mark=none] coordinates {(1,1.61696) (11,1.21521) (21,0.72472) (31,0.59736) (41,0.57105) (51,0.56560) (61,0.56455) (71,0.56438) (81,0.56434) (91,0.56429) (101,0.56433) (111,0.56430) (121,0.56431) (131,0.56429) (141,0.56431) (150,0.56429)};\addlegendentry{SGD}
+\addplot+[mark=none] coordinates {(1,1.53891) (11,0.56470) (21,0.56454) (31,0.56443) (41,0.56477) (51,0.56441) (61,0.56449) (71,0.56442) (81,0.56459) (91,0.56456) (101,0.56519) (111,0.56454) (121,0.56430) (131,0.56445) (141,0.56441) (150,0.56455)};\addlegendentry{Momentum}
+\addplot+[mark=none] coordinates {(1,1.07006) (11,0.57096) (21,0.56453) (31,0.56440) (41,0.56447) (51,0.56432) (61,0.56441) (71,0.56437) (81,0.56442) (91,0.56432) (101,0.56446) (111,0.56433) (121,0.56432) (131,0.56429) (141,0.56434) (150,0.56435)};\addlegendentry{AdaGrad}
+\addplot+[mark=none] coordinates {(1,1.50348) (11,0.64226) (21,0.56440) (31,0.56476) (41,0.56460) (51,0.56443) (61,0.56475) (71,0.56483) (81,0.56479) (91,0.56468) (101,0.56468) (111,0.56457) (121,0.56455) (131,0.56448) (141,0.56451) (150,0.56499)};\addlegendentry{RMSprop}
+\addplot+[mark=none] coordinates {(1,1.55026) (11,0.64073) (21,0.56531) (31,0.56444) (41,0.56477) (51,0.56436) (61,0.56448) (71,0.56448) (81,0.56444) (91,0.56454) (101,0.56512) (111,0.56453) (121,0.56431) (131,0.56452) (141,0.56449) (150,0.56458)};\addlegendentry{Adam}
+\end{axis}\end{tikzpicture}\par{\footnotesize Figure 3 : comparaison des sept méthodes, graine 42. Objectif sans étiquette sur les 360 points.}\end{center}
+Les figures de prédictions, de confusion et de groupes décrites dans cette page sont incluses dans le PDF de lecture et disponibles dans le dossier resultats. La source LaTeX autonome montre ici les courbes de comparaison.
+
+\newpage
+\section*{Vérifications et conclusion}
+\subsection*{Vérification numérique des gradients}
+Quelques coordonnées de chaque gradient sont comparées avec les différences finies centrales : [J(theta+h)-J(theta-h)]/(2h), pour h = 10\textasciicircum{}-5. L’erreur relative est |g\_num-g| / max(10\textasciicircum{}-8, |g\_num|+|g|). Le maximum observé sur les cinq modèles est 1.96e-09. Pour le noyau, le contrôle porte également sur un mini-lot avec la régularisation complète.
+
+\subsection*{Coût de calcul}
+Le tableau 6 présente les coûts moyens des méthodes retenues. Une époque GD fait une mise à jour ; une époque avec lots fait plusieurs mises à jour. Les temps incluent les évaluations de suivi, mais pas les essais de sélection ni le tracé des figures. La recherche numérique effectue plusieurs appels de perte par gradient. L’égalité du nombre d’époques ne signifie donc pas l’égalité du coût. Les courbes complètes selon époques et temps sont enregistrées dans resultats.
+
+\subsection*{Contrôle et reproduction}
+Pour OLS, le contrôle utilise une résolution par moindres carrés. Pour ridge, on résout H*w = X\textsuperscript{T}y/n ; pour RBF, (K+n*lambda*I)*a = y. Ces solutions contrôlent et sélectionnent les hyperparamètres, mais ne remplacent pas les sept entraînements. L’écart entre les prédictions entraînées et celles du contrôle est dans resultats\_bruts.csv. Pour reproduire : installer requirements.txt puis lancer python tp.py --epochs 150 dans le dossier du projet.
+
+\subsection*{Bilan personnel}
+Sur ces essais, le noyau RBF décrit mieux la régression non linéaire. Le réseau distingue bien les trois spirales avec plusieurs optimiseurs. Pour Blobs, les méthodes atteignent des groupes similaires. Le choix doit tenir compte de la validation, du temps et de la stabilité entre graines. Les résultats restent limités aux trois jeux fournis et à une petite grille de paramètres. Certaines exigences détaillées de l’énoncé, notamment les jeux réels et leurs visualisations, restent hors de cette version simplifiée.
+
+\subsection*{Reproduire les résultats}
+Dans le dossier du projet, installer les dépendances avec python -m pip install -r requirements.txt, puis lancer python tp.py --epochs 150. Les tableaux CSV contiennent les métriques et leurs écarts types. Les figures plus grandes, les contrôles des gradients et les versions sont dans resultats. Sources : fiche de TP de l’enseignant et archive fournie. Aucune donnée manquante n’a été remplacée par un résultat inventé.
+
+\begin{center}{\footnotesize Tableau 6 - Coût moyen de l’entraînement final\par\medskip\begin{tabular}{llllll}\toprule
+Modèle & Méthode & Temps (s) & Mises à jour & Gradients & Pertes \\
+\midrule
+RBF & Adam & 0.13 & 1050 & 1050 & 300 \\
+classification & RMSprop & 0.39 & 1350 & 1350 & 300 \\
+clustering & GD-recherche & 0.25 & 150 & 150 & 2400 \\
+\bottomrule\end{tabular}}\end{center}
+\end{document}

@@ -1,0 +1,6 @@
+﻿jeu,modele,erreur_relative
+classification_spiral3,classification,1.957457292065229e-09
+clustering_blobs3,clustering,6.652399022642029e-10
+regression_nonlinear,OLS,2.1720448416970604e-10
+regression_nonlinear,Ridge,2.0197492524704265e-10
+regression_nonlinear,RBF,6.32906303998542e-10

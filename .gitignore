@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+resultats/cache/
+rapport.pdf
+rapport_ameliore.pdf
